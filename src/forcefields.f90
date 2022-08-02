@@ -60,7 +60,7 @@ end function lj_f
 function ff(particle1, particle2, nparticles, r, sigma, epsilon, cutoff)
   integer, intent(in) :: nparticles, particle1, particle2
 
-  real(dp), intent(in) :: epsilon, sigma, cutoff ! sigma = l0, epsilon = depth
+  real(dp), intent(in) :: epsilon, sigma, cutoff ! sigma = (P = 0), epsilon = depth
   real(dp), dimension(3, nparticles, -1:2), intent(in) :: r
 
   !real(dp), dimension(3, nparticles, 1) :: calc_f
@@ -70,11 +70,18 @@ function ff(particle1, particle2, nparticles, r, sigma, epsilon, cutoff)
 
   l0 = 1. ! Equilibrium lengh
 
-  ! Calculate 3d-distances
+  ! Calculate xyz-distances
   d = r(:, particle2, 0) - r(:, particle1, 0)
 
   ! Calculate net distance between particles
   l = SQRT(d(1) ** 2 + d(2) ** 2 + d(3) ** 2)
+
+
+  ! Decide if d < cutoff, if now -> skip
+  if (ö < cutoff) then
+
+  end if
+
 
   ! Calculate force lj-potential with cutoff
   f = 4 * epsilon * (-((12 * sigma ** 12)/(l ** 13) + ((6 * sigma ** 6)/(l ** 7))))
