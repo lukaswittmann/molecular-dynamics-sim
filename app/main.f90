@@ -38,7 +38,8 @@ f = 0
 do particle1 = 1, nparticles          ! Iteration over each particle
   do particle2 = 1, nparticles        ! Interaction with each other particle
     if (particle1 /= particle2) then  ! No selfinteraction
-      f(:,particle1,1) = f(:,particle1,1) + lj_f(particle1, particle2, nparticles, r, 1.6_dp, 1.0_dp)
+      f(:,particle1,1) = f(:,particle1,1) &
+                         + lj_f(particle1, particle2, nparticles, r, 1.6_dp, 1.0_dp)
     end if  
   end do
 end do
