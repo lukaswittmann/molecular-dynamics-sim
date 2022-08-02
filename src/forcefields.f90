@@ -63,24 +63,16 @@ function ff(particle1, particle2, nparticles, r, l, sigma, epsilon)
   real(dp), intent(in) :: epsilon, sigma, l ! sigma = (P = 0), epsilon = depth
   real(dp), dimension(3, nparticles, -1:2), intent(in) :: r
 
-  !real(dp), dimension(3, nparticles, 1) :: calc_f
-  real(dp) :: l0
   real(dp), dimension(3) :: d
   real(dp), dimension(3) :: ff
-
-  l0 = 1. ! Equilibrium lengh
 
   ! Calculate xyz-distances
   d = r(:, particle2, 0) - r(:, particle1, 0)
 
   ! Calculate net distance between particles: is done in main iterationloop
+  ! Decide if l < cutoff is also done in main iterationloop
 
-  ! Decide if l < cutoff is done in main iterationloop
-
-  ff(:) = 4 * epsilon * (-((12 * sigma ** 12)/(l ** 13) + ((6 * sigma ** 6)/(l ** 7)))) * (d(:)/l)
-
-
-  
+  ff(:) = 4 * epsilon * (-((12 * sigma ** 12)/(l ** 13) + ((6 * sigma ** 6)/(l ** 7)))) * (d(:)/l)  
 end function ff      
 
     
