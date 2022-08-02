@@ -60,7 +60,7 @@ end function lj_f
 function ff(particle1, particle2, nparticles, d, l, sigma, epsilon)
   integer, intent(in) :: nparticles, particle1, particle2
 
-  real(dp), intent(in) :: epsilon, sigma, l ! sigma = (P = 0), epsilon = depth
+  real(dp), intent(in) :: epsilon, sigma, l
 
   real(dp), dimension(3), intent(in) :: d
   real(dp), dimension(3) :: ff

@@ -2,10 +2,8 @@ module utils
 
 use types, only: dp
 implicit none
-!private
-!public save_md_array, savetxt, rand_r, rand_v, print_final_rv, save_trajectory
-contains
 
+contains
 
 subroutine savetxt(filename, d)
     character(len=*), intent(in) :: filename  ! File to save the array to
@@ -56,8 +54,7 @@ subroutine save_trajectory(filename, d) ! Saves each particles coords in each li
     close(s)
 end subroutine save_trajectory
 
-
-! -------------------------------------------------------------------------------------------
+! -------------------------------------------------------------------------------------------- !
 
 function rand_r(nparticles, boxsize)
   ! Generate random starting positions
@@ -86,9 +83,9 @@ function rand_v(nparticles, factor)
           call random_number(randvx)
           call random_number(randvy)
           call random_number(randvz)
-          rand_v(1, iter) = randvx * (factor / 100)
-          rand_v(2, iter) = randvy * (factor / 100)
-          rand_v(3, iter) = randvz * (factor / 100)
+          rand_v(1, iter) = (randvx - 0.5) * (factor / 100)
+          rand_v(2, iter) = (randvy - 0.5) * (factor / 100)
+          rand_v(3, iter) = (randvz - 0.5) * (factor / 100)
       end do   
 end function rand_v
 
