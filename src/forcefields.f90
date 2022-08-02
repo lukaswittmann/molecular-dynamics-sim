@@ -57,17 +57,15 @@ end function lj_f
 
 
 
-function ff(particle1, particle2, nparticles, r, l, sigma, epsilon)
+function ff(particle1, particle2, nparticles, d, l, sigma, epsilon)
   integer, intent(in) :: nparticles, particle1, particle2
 
   real(dp), intent(in) :: epsilon, sigma, l ! sigma = (P = 0), epsilon = depth
-  real(dp), dimension(3, nparticles, -1:2), intent(in) :: r
 
-  real(dp), dimension(3) :: d
+  real(dp), dimension(3), intent(in) :: d
   real(dp), dimension(3) :: ff
 
   ! Calculate xyz-distances
-  d = r(:, particle2, 0) - r(:, particle1, 0)
 
   ! Calculate net distance between particles: is done in main iterationloop
   ! Decide if l < cutoff is also done in main iterationloop

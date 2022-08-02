@@ -24,8 +24,8 @@ for x in os.listdir():
         r1 = np.loadtxt(x, delimiter='\t')
         ax.scatter(r1[:,0],r1[:,1],r1[:,2])
 
-ax.set_xlim3d(-15,15)
-ax.set_ylim3d(-15,15)
-ax.set_zlim3d(-15,15)
+ax.set_xlim3d(0,10)
+ax.set_ylim3d(0,10)
+ax.set_zlim3d(0,10)
 
 plt.show()

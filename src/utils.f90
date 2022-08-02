@@ -59,9 +59,10 @@ end subroutine save_trajectory
 
 ! -------------------------------------------------------------------------------------------
 
-function rand_r(nparticles, factor)
+function rand_r(nparticles, boxsize)
   ! Generate random starting positions
-    integer, intent(in) :: nparticles, factor
+    integer, intent(in) :: nparticles
+    real(dp), dimension(3) :: boxsize
     real(dp), dimension(3,nparticles,-1:2) :: rand_r
     integer :: iter
     real(dp) :: randx, randy, randz
@@ -69,9 +70,9 @@ function rand_r(nparticles, factor)
         call random_number(randx)
         call random_number(randy)
         call random_number(randz)
-        rand_r(1, iter, :) = randx * factor
-        rand_r(2, iter, :) = randy * factor
-        rand_r(3, iter, :) = randz * factor
+        rand_r(1, iter, :) = randx * boxsize(1)
+        rand_r(2, iter, :) = randy * boxsize(2)
+        rand_r(3, iter, :) = randz * boxsize(3)
     end do   
 end function rand_r
 
