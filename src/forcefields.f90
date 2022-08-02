@@ -27,9 +27,8 @@ function spring_f(particle1, particle2, nparticles, r, force_const)
 
   ! Calculate force (spring)
   f = ( force_const * (l - l0))
-  spring_f(1) = f * (d(1)/l)
-  spring_f(2) = f * (d(2)/l)
-  spring_f(3) = f * (d(3)/l)  
+  spring_f(:) = f * (d(:)/l)
+
 end function spring_f
     
     
@@ -51,11 +50,9 @@ function lj_f(particle1, particle2, nparticles, r, sigma, epsilon)
   ! Calculate net distance between particles
   l = SQRT(d(1) ** 2 + d(2) ** 2 + d(3) ** 2)
 
-  ! Calculate force (spring)
+  ! Calculate force lj-potential
   f = 4 * epsilon * (-((12 * sigma ** 12)/(l ** 13) + ((6 * sigma ** 6)/(l ** 7))))
-  lj_f(1) = f * (d(1)/l)
-  lj_f(2) = f * (d(2)/l)
-  lj_f(3) = f * (d(3)/l)  
+  lj_f(:) = f * (d(:)/l)
 end function lj_f
 
 
@@ -79,11 +76,10 @@ function ff(particle1, particle2, nparticles, r, sigma, epsilon, cutoff)
   ! Calculate net distance between particles
   l = SQRT(d(1) ** 2 + d(2) ** 2 + d(3) ** 2)
 
-  ! Calculate force (spring)
+  ! Calculate force lj-potential with cutoff
   f = 4 * epsilon * (-((12 * sigma ** 12)/(l ** 13) + ((6 * sigma ** 6)/(l ** 7))))
-  ff(1) = f * (d(1)/l)
-  ff(2) = f * (d(2)/l)
-  ff(3) = f * (d(3)/l)  
+  ff(:) = f * (d(:)/l)
+
 end function ff      
 
     
