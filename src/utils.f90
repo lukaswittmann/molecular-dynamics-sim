@@ -29,7 +29,7 @@ subroutine save_md_array(filename, d) ! Saves each particles coords in each line
     close(s)
 end subroutine save_md_array
 
-subroutine print_final_rv(r, v, nparticles)
+subroutine print_rv(r, v, nparticles)
     integer, intent(in) :: nparticles
     real(dp), dimension(3,nparticles), intent(in) :: r, v
     print *, '=============================== Positions:  =============================='
@@ -38,7 +38,7 @@ subroutine print_final_rv(r, v, nparticles)
     print *, v
     print *, '=========================================================================='
 
-end subroutine print_final_rv
+end subroutine print_rv
 
 subroutine save_trajectory(filename, d) ! Saves each particles coords in each line
     character(len=*), intent(in) :: filename  ! File to save the array to
