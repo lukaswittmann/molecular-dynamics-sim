@@ -34,8 +34,7 @@ function minimize_energy(r_in, nparticles, properties, boxsize, l0, cutoff)
 integrator: do
   iter = iter +1
 
-  ! Damping and implementation of velocity
-  minimize_energy(:,:,-1) = minimize_energy(:,:,0) - (v(:,:)/2 * dt)
+
 
   f = 0
   do particle1 = 1, nparticles   ! Interaction for each particle
@@ -71,7 +70,10 @@ integrator: do
   minimize_energy(:,:,1) = 2 * minimize_energy(:,:,0) - minimize_energy(:,:,-1) + (f(:,:,1) / properties(:,:,1)) * (dt ** 2)
     
   ! Calculate velocities by numerical derivation
-  v = (minimize_energy(:,:,1) - minimize_energy(:,:,-1)) / (2 * dt)
+  v = (minimize_energy(:,:,0) - minimize_energy(:,:,-1)) / (1 * dt)
+
+  ! Damping and implementation of velocity
+  minimize_energy(:,:,0) = minimize_energy(:,:,1) - (v(:,:)/2 * dt)
     
   ! Move array to t = t+dt for next integration step
   minimize_energy = cshift(minimize_energy,  1, DIM=3)

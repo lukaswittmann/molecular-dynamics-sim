@@ -139,7 +139,7 @@ integrator: do iter = 0, maxiter
   ! Checks if simulation failed every .. iterations
   if (mod(iter, 1000)==0) then
     if ((maxval(r(:,:,-1)) > maxval(boxsize(:))) .or. (minval(r(:,:,-1)) < 0)) then
-      print '(/,A,/)', "ERROR: Calculation out of bounds, aborting..."
+      print '(/,A,/)', "ERROR: Calculation out of bounds, aborting after", iter, "iterations.."
       exit integrator
     end if
   end if
