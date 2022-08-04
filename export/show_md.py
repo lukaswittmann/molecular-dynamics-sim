@@ -34,6 +34,6 @@ def update(t):
 fig = plt.figure(dpi=100)
 ax = fig.add_subplot(projection='3d')
 
-ani = FuncAnimation(fig = fig, func = update, frames=np.arange(0, frames, 10), repeat=True, interval = 0)
+ani = FuncAnimation(fig = fig, func = update, frames=np.arange(0, frames, 1), repeat=True, interval = 0)
 #ani.save('md.mp4', dpi=150, writer='ffmpeg', fps=60)
 plt.show()
