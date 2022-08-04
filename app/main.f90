@@ -4,10 +4,11 @@ use types, only: dp
 use forcefields
 use utils
 use energy_minimization
+use constants, only: kB
 implicit none
 
 integer, parameter :: nparticles = 50
-real(dp), parameter :: dt = 0.001, t = 100., cutoff = 8., sigma = 1., epsilon = 1.  ! sigma = (P = 0), epsilon = depth
+real(dp), parameter :: dt = 0.001, t = 100., cutoff = 8., sigma = 1., epsilon = 100.  ! sigma = (P = 0), epsilon = depth
 integer, parameter :: maxiter = INT(t/dt + 1)
 integer :: beginning, rate, end, iter, particle1, particle2, interaction, particle, dim, dim1, dim2, dim3
 character (len=10) :: file_name
@@ -18,7 +19,11 @@ real(dp), dimension(3, nparticles, -1:2) :: r       ! ([x,y,z], particle, [t-dt,
 real(dp), dimension(3, nparticles) :: v = 0         ! ([x,y,z], particle)
 real(dp), dimension(3, nparticles,1) :: f = 0       ! ([f(x),f(y),f(z)], particle)
 real(dp), dimension(3) :: d, d0
-real(dp) :: l ! Needed for cutoff and calculation of force
+real(dp) :: l
+! Thermostat variables
+real(dp), parameter :: tau_T = (dt * 100) ! relaxation time of thermostat
+real(dp) :: E, T_inst, T0 = 5000.
+
 
 ! Generate random starting positions in boxsize and initial velocities
 r(:,:,:) = rand_r(nparticles, boxsize) 
@@ -26,7 +31,7 @@ v(:,:) = rand_v(nparticles, 1)
 r(:,:,-1) = r(:,:,0) - v(:,:) * dt
 !call print_rv(r(:,:,0:0), v, nparticles) 
 
-properties(:,:,1) = 1. ! Set mass
+properties(:,:,1) = 0.1 ! Set mass
 
 ! Energy minimization
 print '(/,A,/)', "** ENERGY MINIMIZATION **"
@@ -59,20 +64,21 @@ integrator: do iter = 0, maxiter
   ! Calculation of particle interactions
   f = 0
   do particle1 = 1, nparticles   ! Interaction for each particle
+    ! This will be parallelized
     do particle2 = 1, nparticles ! ..with each other particle
       if (particle1 /= particle2) then  
 
-        d0 = r(:, particle2, 0) - boxsize(:) - r(:, particle1, 0)
+        d0 = r(:, particle2, 0) - r(:, particle1, 0)
 
-        do dim1 = 1,3
-          do dim2 = 1,3
-            do dim3 = 1,3
+        do dim1 = -1,1
+          do dim2 = -1,1
+            do dim3 = -1,1
 
               ! Define new position of image and for dim1=dim2=dim3=1 of real particle interaction
               d = d0
-              d(1) = d(1) + (dim1 - 1) * boxsize(1)
-              d(2) = d(2) + (dim2 - 1) * boxsize(2)
-              d(3) = d(3) + (dim3 - 1) * boxsize(3)
+              d(1) = d(1) + (dim1) * boxsize(1)
+              d(2) = d(2) + (dim2) * boxsize(2)
+              d(3) = d(3) + (dim3) * boxsize(3)
 
               l = SQRT(d(1) ** 2 + d(2) ** 2 + d(3) ** 2)
 
@@ -86,6 +92,7 @@ integrator: do iter = 0, maxiter
 
       end if
     end do
+
   end do
 
   ! Do Verlet integration step
@@ -96,14 +103,9 @@ integrator: do iter = 0, maxiter
 
   ! Move array to t = t+dt for next integration step
   r = cshift(r,  1, DIM=3)
-
-  if (mod(iter, 1000)==0) then
-    ! Calculate temperature (kinetic energy) in [a.u]
-    print *, "Energy =",  (properties(1,1,1) / 2 * sum(v ** 2)), (real(iter)/real(maxiter)*100), "%"
-  end if
     
   ! Save trajectories, velocities and forces every .. iterations
-  !if (mod(iter, 20)==0) then
+  !if (mod(iter, 1)==0) then
   !  do particle = 1, nparticles
   !    write (file_name,'(i0)') particle
   !    call save_trajectory("export/r_"//trim(file_name)//".txt", r(:,particle,0))
@@ -111,6 +113,28 @@ integrator: do iter = 0, maxiter
   !    call save_trajectory("export/f_"//trim(file_name)//".txt", f(:,particle,1))
   !  end do
   !end if
+
+! Thermostat
+  ! Calculate E and T_inst
+  E = properties(1,1,1) / 2 * sum(v ** 2)
+  T_inst = ((2 * E) / (3 * kB) / nparticles) / 1E20 ! Artificial scaling due to [a.u.]
+  ! Isokinetic thermostat
+  !v = v * SQRT(T0 / T_inst)
+  ! Weak coupling thermostat
+  v = v * SQRT(1 + (dt / tau_T) * (T0 / T_inst - 1))
+  ! Apply velocity to r(t-dt) for algorithm
+  r(:,:,-1) = r(:,:,0) - (v(:,:) * dt)
+  ! Bossi-Parinello, fluctuating T0 (stochastic velositc rescaling): TBD
+
+! Barostat
+
+
+
+  if (mod(iter, 50)==0) then
+    print *, "Energy =",  E, "Temperature =", T_inst
+    print *, (real(iter)/real(maxiter)*100), "% "
+    print *, " "
+  end if
 
   ! Checks if simulation failed every .. iterations
   if (mod(iter, 1000)==0) then
