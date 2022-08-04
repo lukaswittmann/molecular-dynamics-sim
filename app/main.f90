@@ -7,26 +7,28 @@ use energy_minimization
 use constants, only: kB
 implicit none
 
-integer, parameter :: nparticles = 50
+! Md run settings
+integer, parameter :: nparticles = 100
 real(dp), parameter :: dt = 0.001, t = 100., cutoff = 8., sigma = 1., epsilon = 100.  ! sigma = (P = 0), epsilon = depth
 integer, parameter :: maxiter = INT(t/dt + 1)
+real(dp), dimension(3) :: boxsize = (/15.,15.,15./) ! define xyz boxsize
+
+! Thermostat settings
+real(dp), parameter :: tau_T = (dt * 100) ! relaxation time of thermostat
+real(dp) :: E, T_inst, T0 = 5000.
+! Barostat settings
+real(dp), parameter :: tau_P = (dt * 50) ! relaxation time of thermostat
+real(dp) :: mu, V_inst, P_inst, P0 = 6.
+
+! Runtime stuff
 integer :: beginning, rate, end, iter, particle1, particle2, interaction, particle, dim, dim1, dim2, dim3
 character (len=10) :: file_name
-
-real(dp), dimension(3) :: boxsize = (/10.,10.,10./) ! define xyz boxsize
 real(dp), dimension(3, nparticles, 1) :: properties ! 1: mass  2: ..   3: .. [x,y,z] for anisotropy
 real(dp), dimension(3, nparticles, -1:2) :: r       ! ([x,y,z], particle, [t-dt, t, t+dt, t+2dt])
 real(dp), dimension(3, nparticles) :: v = 0         ! ([x,y,z], particle)
 real(dp), dimension(3, nparticles,1) :: f = 0       ! ([f(x),f(y),f(z)], particle)
 real(dp), dimension(3) :: d, d0
 real(dp) :: l
-! Thermostat variables
-real(dp), parameter :: tau_T = (dt * 100) ! relaxation time of thermostat
-real(dp) :: E, T_inst, T0 = 5000.
-! Barostat variables
-real(dp), parameter :: tau_P = (dt * 100) ! relaxation time of thermostat
-real(dp) :: mu, V_inst, P_inst, P0 = 1.
-
 
 ! Generate random starting positions in boxsize and initial velocities
 r(:,:,:) = rand_r(nparticles, boxsize) 
@@ -129,7 +131,7 @@ integrator: do iter = 0, maxiter
   boxsize = boxsize * mu
 
   ! Console notifier during run
-  if (mod(iter, 50)==0) then
+  if (mod(iter, 500)==0) then
     print *, "Energy =",  E, "Temperature =", T_inst
     print *, "Volume =",  V_inst, "Pressure =", P_inst
 !    print *, "Sum forces =", sum(r(:,:,-1) * abs(f(:,:,1))), "factor =", mu
