@@ -37,7 +37,6 @@ subroutine print_rv(r, v, nparticles)
     print *, '=============================== Velocities: =============================='
     print *, v
     print *, '=========================================================================='
-
 end subroutine print_rv
 
 subroutine save_trajectory(filename, d) ! Saves each particles coords in each line
@@ -46,13 +45,20 @@ subroutine save_trajectory(filename, d) ! Saves each particles coords in each li
 
     integer :: s, i
     open(newunit=s, file=filename, access="sequential",  position="append")
-
-    !do i = 1, size(d, 1)
-        write(s, '(*(G0.6,:,"'//achar(9)//'"))') d(:) ! xyz, particle
-    !end do
-
+    write(s, '(*(G0.6,:,"'//achar(9)//'"))') d(:) ! xyz, particle
     close(s)
 end subroutine save_trajectory
+
+subroutine save_td_data(filename, d)
+    character(len=*), intent(in) :: filename  ! File to save the array to
+    real(dp), intent(in) :: d          ! The 2D array to save
+
+    integer :: s, i
+    open(newunit=s, file=filename, access="sequential",  position="append")
+    write(s, '(*(G0.6,:,"'//achar(9)//'"))') d ! xyz, particle
+    close(s)
+end subroutine save_td_data
+
 
 ! -------------------------------------------------------------------------------------------- !
 

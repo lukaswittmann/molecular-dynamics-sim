@@ -23,6 +23,9 @@ real(dp) :: l
 ! Thermostat variables
 real(dp), parameter :: tau_T = (dt * 100) ! relaxation time of thermostat
 real(dp) :: E, T_inst, T0 = 5000.
+! Barostat variables
+real(dp), parameter :: tau_P = (dt * 100) ! relaxation time of thermostat
+real(dp) :: mu, V_inst, P_inst, P0 = 1.
 
 
 ! Generate random starting positions in boxsize and initial velocities
@@ -103,23 +106,11 @@ integrator: do iter = 0, maxiter
 
   ! Move array to t = t+dt for next integration step
   r = cshift(r,  1, DIM=3)
-    
-  ! Save trajectories, velocities and forces every .. iterations
-  !if (mod(iter, 1)==0) then
-  !  do particle = 1, nparticles
-  !    write (file_name,'(i0)') particle
-  !    call save_trajectory("export/r_"//trim(file_name)//".txt", r(:,particle,0))
-  !    call save_trajectory("export/v_"//trim(file_name)//".txt", v(:,particle))
-  !    call save_trajectory("export/f_"//trim(file_name)//".txt", f(:,particle,1))
-  !  end do
-  !end if
 
 ! Thermostat
   ! Calculate E and T_inst
-  E = properties(1,1,1) / 2 * sum(v ** 2)
-  T_inst = ((2 * E) / (3 * kB) / nparticles) / 1E20 ! Artificial scaling due to [a.u.]
-  ! Isokinetic thermostat
-  !v = v * SQRT(T0 / T_inst)
+  E = (properties(1,1,1) / 2) * sum(v ** 2)
+  T_inst = ((2 * E) / (3 * kB * nparticles)) / 1E20 ! Artificial scaling due to [a.u.]
   ! Weak coupling thermostat
   v = v * SQRT(1 + (dt / tau_T) * (T0 / T_inst - 1))
   ! Apply velocity to r(t-dt) for algorithm
@@ -127,19 +118,45 @@ integrator: do iter = 0, maxiter
   ! Bossi-Parinello, fluctuating T0 (stochastic velositc rescaling): TBD
 
 ! Barostat
+  ! Calculate V_inst and P_inst
+  V_inst = boxsize(1) * boxsize(2) * boxsize(3)
+  P_inst = ((nparticles * kB * ((2 * E) / (3 * kB) / nparticles)) / V_inst) &
+  + (1 / (3 * V_inst)) * sum(r(:,:,-1) * abs(f(:,:,1)))
+  ! Scaling factor
+  mu = (1 - (dt / tau_P) * (P0 - P_inst)) ** (1./3.)
+  ! Scale coordinates and boxsize by mu
+  r = r * mu
+  boxsize = boxsize * mu
 
-
-
+  ! Console notifier during run
   if (mod(iter, 50)==0) then
     print *, "Energy =",  E, "Temperature =", T_inst
+    print *, "Volume =",  V_inst, "Pressure =", P_inst
+!    print *, "Sum forces =", sum(r(:,:,-1) * abs(f(:,:,1))), "factor =", mu
     print *, (real(iter)/real(maxiter)*100), "% "
     print *, " "
+  end if
+
+  ! Save trajectories, velocities, forces and thermodynamics data every .. iterations
+  if (mod(iter, 10)==0) then
+    !do particle = 1, nparticles
+      !write (file_name,'(i0)') particle
+      !call save_trajectory("export/r_"//trim(file_name)//".txt", r(:,particle,0))
+      !call save_trajectory("export/v_"//trim(file_name)//".txt", v(:,particle))
+      !call save_trajectory("export/f_"//trim(file_name)//".txt", f(:,particle,1))
+    !end do
+    call save_td_data("export/time.txt", (iter*dt))
+    call save_td_data("export/T.txt", T_inst)
+    call save_td_data("export/V.txt", V_inst)
+    call save_td_data("export/P.txt", P_inst)
   end if
 
   ! Checks if simulation failed every .. iterations
   if (mod(iter, 1000)==0) then
     if ((maxval(r(:,:,-1)) > maxval(boxsize(:))) .or. (minval(r(:,:,-1)) < 0)) then
-      print '(/,A,/)', "ERROR: Calculation out of bounds, aborting after", iter, "iterations.."
+      print *, " "
+      print *, "ERROR: Calculation out of bounds, aborting after", iter, "iterations.."
+      print *, " "
       exit integrator
     end if
   end if

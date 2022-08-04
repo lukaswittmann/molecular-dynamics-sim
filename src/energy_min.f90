@@ -93,7 +93,7 @@ integrator: do
     ! Calculate temperature (kinetic energy) in [a.u]
     print *, "Energy =",  (properties(1,1,1) / 2 * sum(v ** 2)), "at step =", iter
     ! Quit energy minimization if done
-    if ((properties(1,1,1) / 2 * sum(v ** 2)) < 1E-5) EXIT integrator
+    if ((properties(1,1,1) / 2 * sum(v ** 2)) < 1E-4) EXIT integrator
   end if
        
     ! Save trajectories, velocities and forces every .. iterations
