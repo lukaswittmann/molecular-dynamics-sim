@@ -17,7 +17,7 @@ function minimize_energy(r_in, nparticles, properties, boxsize, l0, cutoff)
     real(dp), dimension(3), intent(in) :: boxsize 
     real(dp), intent(in) :: l0, cutoff
 
-    real(dp), parameter :: dt = 0.01
+    real(dp), parameter :: dt = 0.002
     integer :: iter = 0, particle1, particle2, particle, dim, dim1, dim2, dim3
     character (len=10) :: file_name
     
@@ -33,8 +33,6 @@ function minimize_energy(r_in, nparticles, properties, boxsize, l0, cutoff)
 ! Integration loop
 integrator: do
   iter = iter +1
-
-
 
   f = 0
   do particle1 = 1, nparticles   ! Interaction for each particle
@@ -70,9 +68,9 @@ integrator: do
   minimize_energy(:,:,1) = 2 * minimize_energy(:,:,0) - minimize_energy(:,:,-1) + (f(:,:,1) / properties(:,:,1)) * (dt ** 2)
     
   ! Calculate velocities by numerical derivation
-  v = (minimize_energy(:,:,0) - minimize_energy(:,:,-1)) / (1 * dt)
+  v = (minimize_energy(:,:,1) - minimize_energy(:,:,-1)) / (2 * dt)
 
-  ! Damping and implementation of velocity
+  ! Implementation and damping of velocity by 1/(..)
   minimize_energy(:,:,0) = minimize_energy(:,:,1) - (v(:,:)/2 * dt)
     
   ! Move array to t = t+dt for next integration step
@@ -95,7 +93,7 @@ integrator: do
     ! Calculate temperature (kinetic energy) in [a.u]
     print *, "Energy =",  (properties(1,1,1) / 2 * sum(v ** 2)), "at step =", iter
     ! Quit energy minimization if done
-    if ((properties(1,1,1) / 2 * sum(v ** 2)) < 1E-4) EXIT integrator
+    if ((properties(1,1,1) / 2 * sum(v ** 2)) < 1E-5) EXIT integrator
   end if
        
     ! Save trajectories, velocities and forces every .. iterations
@@ -118,7 +116,9 @@ end do integrator
 
 ! -------------------------------------------------------------------------------------------- !
 
-print '(/,A,/)', "Minimization done!"
+print *, " "
+print *, "Minimization done after", iter, "iterations!"
+print *, " "
 
 end function minimize_energy
 
