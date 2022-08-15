@@ -8,10 +8,10 @@ import numpy as np
 from mpl_toolkits.mplot3d import Axes3D
 import os  
 
-nparticles = 100
+nparticles = 250
 r = np.loadtxt("r_1.txt", delimiter='\t')
 frames = int(len(r))
-boxsize = 2e-9
+boxsize = 10e-9
 
 r_array = np.zeros([nparticles,frames,3],dtype=float)
 i = 0
@@ -35,6 +35,6 @@ def update(t):
 fig = plt.figure(dpi=100)
 ax = fig.add_subplot(projection='3d')
 
-ani = FuncAnimation(fig = fig, func = update, frames=np.arange(0, frames, 10), repeat=True, interval = 0)
-ani.save('Ar_md.mp4', dpi=150, writer='ffmpeg', fps=60)
+ani = FuncAnimation(fig = fig, func = update, frames=np.arange(0, frames, 1), repeat=True, interval = 0)
+#ani.save('Ar_md.mp4', dpi=150, writer='ffmpeg', fps=60)
 plt.show()

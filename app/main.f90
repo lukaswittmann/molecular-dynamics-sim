@@ -9,32 +9,34 @@ implicit none
 
 ! Md run settings
 integer, parameter :: nparticles = 100
-real(dp), parameter :: dt = (0.002 * 1E-12), t = (200. * 1E-12) ! dt in ps to s, t in ps to s
-real(dp), parameter :: cutoff = (5. * 1E-9) ! in nm to m
+real(dp), parameter :: dt = (0.001 * 1E-12), t = (50. * 1E-12) ! dt in ps to s, t in ps to s
 integer, parameter :: maxiter = INT(t/dt)
-real(dp), dimension(3) :: boxsize = (/10.,10.,10./) * 1E-9 ! Boxsize in nm to meter
+real(dp), dimension(3) :: boxsize = (/13.,13.,13./) * 1E-9 ! Boxsize in nm to meter
+real(dp), dimension(3) :: boxsize_half = (/6.5,6.5,6.5/) ! Cutoff in nm to m
+real(dp) :: cutoff = 6.5
 
 ! Particle settings
-integer, parameter :: atom_type = 3 ! 1: He, 2: Ne, 3: Ar, 4: Kr. 5: Xe
-real(dp), parameter :: sigma = 3.40100e-01 , epsilon = 9.78638e-01 ! Ar
+integer, parameter :: atom_type = 5 ! 1: He, 2: Ne, 3: Ar, 4: Kr. 5: Xe
+! real(dp), parameter :: sigma = 3.40100e-01 , epsilon = 9.78638e-01 ! Ar
 
 ! Thermostat settings
-real(dp), parameter :: tau_T = (1 * 1E-12) ! relaxation time of thermostat in ps to s
-real(dp) :: E, T_inst, T0 = 300. ! in K
+real(dp), parameter :: tau_T = (1 * 1E-11) ! relaxation time of thermostat in ps to s
+real(dp) :: E, T_inst, T0 = 10. ! in K
 
 ! Barostat settings
-real(dp), parameter :: tau_P =  (1. * 1E-6) ! relaxation time of thermostat in ns to s
-real(dp) :: mu, V_inst, P_inst, P0 = (1. * 1E5)  ! in Bar to Pa
+real(dp), parameter :: tau_P =  (1. * 1E-7) ! relaxation time of thermostat in ns to s
+real(dp) :: Xi, mu, V_inst, P_inst, P0 = (100. * 1E5)  ! in Bar to Pa
 
 ! Runtime variables
 integer :: beginning, rate, end, iter, particle1, particle2, interaction, particle, dim, dim1, dim2, dim3
 character (len=10) :: file_name
 real(dp), dimension(3, nparticles, 1) :: properties ! 1: mass  2: ..   3: .. [x,y,z] for anisotropy
-real(dp), dimension(3, nparticles, -1:2) :: r       ! ([x,y,z], particle, [t-dt, t, t+dt, t+2dt])
+real(dp), dimension(3, nparticles, -1:1) :: r       ! ([x,y,z], particle, [t-dt, t, t+dt])
 real(dp), dimension(3, nparticles) :: v = 0         ! ([x,y,z], particle)
-real(dp), dimension(3, nparticles,1) :: f = 0       ! ([f(x),f(y),f(z)], particle)
+real(dp), dimension(3, nparticles, nparticles, 1) :: r_ij = 0 ! Distance triangle matrix
+real(dp), dimension(3, nparticles, nparticles, 1) :: f_ij = 0 ! Force triangle matrix
 real(dp), dimension(3) :: d, d0
-real(dp) :: l, test_R = NA * kB
+real(dp) :: l
 
 ! Generate random starting positions in boxsize and initial velocities
 r(:,:,:) = rand_r(nparticles, boxsize) 
@@ -44,7 +46,7 @@ r(:,:,-1) = r(:,:,0) - v(:,:) * dt
 
 ! Energy minimization
 !print '(/,A,/)', "** ENERGY MINIMIZATION **"
-!r = minimize_energy(r, nparticles, properties, boxsize, 5E-11_dp, cutoff)
+!r = minimize_energy(r, nparticles, properties, boxsize, 5E-11_dp, boxsize_half)
 
 ! Basic md-run information
 print *, "t =", t, "dt =", dt
@@ -57,54 +59,64 @@ print '(/,A,/)', "** MD RUN **"
 ! Integration loop
 integrator: do iter = 0, maxiter
 
-  ! "Particle-teleporter" to fulfill periodic boundary condition
-  do particle = 1, nparticles ! Iterate over all particles
-    do dim = 1, 3 ! Iterate over 3d space
-
-      if (r(dim, particle, 0) > boxsize(dim)) then
-        r(dim, particle, :) = r(dim, particle, :) - boxsize(dim)
-      else if (r(dim, particle, 0) < 0.0_dp) then
-        r(dim, particle, :) = r(dim, particle, :) + boxsize(dim)
-      end if
-
-    end do
+! "Particle-teleporter" to fulfill periodic boundary condition
+do particle = 1, nparticles ! Iterate over all particles
+  do dim = 1, 3 ! Iterate over 3d space
+    if (r(dim, particle, 0) > boxsize(dim)) then
+      r(dim, particle, :) = r(dim, particle, :) - boxsize(dim)
+    else if (r(dim, particle, 0) < 0.0_dp) then
+      r(dim, particle, :) = r(dim, particle, :) + boxsize(dim)
+    end if
   end do
+end do
 
-  ! Calculation of particle interactions
-  f = 0
-  do particle1 = 1, nparticles   ! Interaction for each particle
-    ! This will be parallelized
-    do particle2 = 1, nparticles ! ..with each other particle
-      if (particle1 /= particle2) then  
+! Calculation of particle distances with pbc and interactions
+r_ij = 0
+f_ij = 0
+do particle1 = 1, nparticles   ! Interaction for each particle
+  do particle2 = (particle1 + 1), nparticles ! ..with each other particle
 
-        d0 = r(:, particle2, 0) - r(:, particle1, 0)
-        do dim1 = -1,1
-          do dim2 = -1,1
-            do dim3 = -1,1
+    ! Calculate xyz distances of particle1 and 2
+    r_ij(:, particle1, particle2, 1) = r(:, particle2, 0) - r(:, particle1, 0)
 
-              ! Define new position of image and for dim1=dim2=dim3=1 of real particle interaction
-              d = d0
-              d(1) = d(1) + (dim1) * boxsize(1)
-              d(2) = d(2) + (dim2) * boxsize(2)
-              d(3) = d(3) + (dim3) * boxsize(3)
+    ! Dimension x
+    if (r_ij(1, particle1, particle2, 1) < -1 * boxsize_half(1)) then
+      r_ij(1, particle1, particle2, 1) = r_ij(1, particle1, particle2, 1) + boxsize_half(1)
+    else if (r_ij(1, particle1, particle2, 1) > boxsize_half(1)) then
+      r_ij(1, particle1, particle2, 1) = r_ij(1, particle1, particle2, 1) - boxsize_half(1)
+    end if
 
-              l = SQRT(d(1) ** 2 + d(2) ** 2 + d(3) ** 2)
+    ! Dimension y
+    if (r_ij(2, particle1, particle2, 1) < -1 * boxsize_half(2)) then
+      r_ij(2, particle1, particle2, 1) = r_ij(2, particle1, particle2, 1) + boxsize_half(2)
+    else if (r_ij(2, particle1, particle2, 1) > boxsize_half(2)) then
+      r_ij(2, particle1, particle2, 1) = r_ij(2, particle1, particle2, 1) - boxsize_half(2)
+    end if
 
-              if (l < cutoff) then
-                f(:,particle1,1) = f(:,particle1,1) + fitted_lj_f(d, l, ff_parameters(:,atom_type))
-              end if
+    ! Dimension z
+    if (r_ij(3, particle1, particle2, 1) < -1 * boxsize_half(3)) then
+      r_ij(3, particle1, particle2, 1) = r_ij(3, particle1, particle2, 1) + boxsize_half(3)
+    else if (r_ij(3, particle1, particle2, 1) > boxsize_half(3)) then
+      r_ij(3, particle1, particle2, 1) = r_ij(3, particle1, particle2, 1) - boxsize_half(3)
+    end if
 
-            end do
-          end do
-        end do
+    ! Mirror distances to other triangle matrix
+    r_ij(:, particle2, particle1, 1) = - r_ij(:, particle1, particle2, 1)
 
-      end if
-    end do
+    ! Calculate total distance for cutoff
+    l = SQRT(r_ij(1, particle1, particle2, 1) ** 2 + r_ij(2, particle1, particle2, 1) ** 2 + r_ij(3, particle1, particle2, 1) ** 2)
+
+    ! Calculate interactions if l < cutoff
+    if (l < cutoff) then
+      f_ij(:, particle1, particle2, 1) = (fitted_lj_f(r_ij(:, particle1, particle2, 1), l, ff_parameters(:,atom_type)) / 2)
+      f_ij(:, particle2, particle1, 1) = - f_ij(:, particle1, particle2, 1)
+    end if
 
   end do
+end do
 
 ! Do Verlet integration step
-  r(:,:,1) = 2 * r(:,:,0) - r(:,:,-1) + (f(:,:,1) / mass(atom_type)) * (dt ** 2)
+  r(:,:,1) = 2 * r(:,:,0) - r(:,:,-1) + (sum(f_ij(:, :, :, 1), DIM=3) / mass(atom_type)) * (dt ** 2)
 
 ! Calculate velocities by numerical derivation
   v = (r(:,:,1) - r(:,:,-1)) / (2 * dt) ! v(t+dt)
@@ -124,12 +136,21 @@ integrator: do iter = 0, maxiter
 ! Barostat
   ! Calculate instantaneous volume and pressure
   V_inst = boxsize(1) * boxsize(2) * boxsize(3)
-  P_inst = ((2 * E) / (3 * V_inst)) + (1 / (3 * V_inst)) * (sum(r(:,:,-1) * f(:,:,1)))
+  ! Calculate Virial Xi_int doublesum, non ideal part of pressure
+  Xi = 0
+  do particle1 = 1, nparticles
+    do particle2 = 1, nparticles
+      Xi = Xi + sum(abs(r_ij(:, particle1, particle2, 1)) * abs(f_ij(:, particle1, particle2, 1)), DIM=1)
+    end do 
+  end do
+  P_inst = ((2 * E) / (3 * V_inst)) + (1 / (3 * V_inst)) * Xi
   ! Scaling factor
   mu = (1 - (dt / tau_P) * (P0 - P_inst)) ** (1./3.)
   ! Scale coordinates and boxsize by mu
   r = r * mu
   boxsize = boxsize * mu
+  boxsize_half = boxsize_half * mu
+  cutoff = cutoff * mu
 
 ! Console notifier during run
   if (mod(iter, 100)==0) then
@@ -137,11 +158,12 @@ integrator: do iter = 0, maxiter
     print *, "Energy (J)",  E, "Temperature (K)", T_inst
     print *, "Volume (nm^3)",  (V_inst * 1E9 ** 3), "Pressure (Pa)", P_inst
     print *, (real(iter)/real(maxiter)*100), "% ", (iter * dt * 1E12), "ps", iter, "/", maxiter
+    print *, "Percentage non-ideal:", (((1 / (3 * V_inst)) * Xi)/(((2 * E) / (3 * V_inst)) + (1 / (3 * V_inst)) * Xi))
     print *, " "
   end if
 
 ! Save trajectories, velocities, forces and thermodynamics data every .. iterations
-  if (mod(iter, 1)==0) then
+  if (mod(iter, 10)==0) then
     ! do particle = 1, nparticles
     !   write (file_name,'(i0)') particle
     !   call save_trajectory("export/r_"//trim(file_name)//".txt", r(:,particle,0))

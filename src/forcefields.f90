@@ -43,7 +43,7 @@ function fitted_lj_f(d, r_in, a) !a0, a1, a2, a3, a4, a5, a6)
   real(dp), dimension(3), intent(in) :: d
   real(dp), dimension(3) :: fitted_lj_f
 
-  r = r_in * 1E9 ! Conversion to nm
+  r = r_in  * 1E9 ! Conversion to nm
 
   ! Force derivative of SAAPx potential
   ! Force converted into Newton

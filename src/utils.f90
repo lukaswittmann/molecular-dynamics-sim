@@ -66,7 +66,7 @@ function rand_r(nparticles, boxsize)
   ! Generate random starting positions
     integer, intent(in) :: nparticles
     real(dp), dimension(3) :: boxsize
-    real(dp), dimension(3,nparticles,-1:2) :: rand_r
+    real(dp), dimension(3, nparticles, -1:1) :: rand_r
     integer :: iter
     real(dp) :: randx, randy, randz
     do iter = 1, nparticles
