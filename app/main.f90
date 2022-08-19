@@ -8,27 +8,27 @@ use constants
 implicit none
 
 ! Md run settings
-integer, parameter :: nparticles = 100
-real(dp), parameter :: dt = (0.001 * 1E-12), t = (50. * 1E-12) ! dt in ps to s, t in ps to s
+integer, parameter :: nparticles = 512
+real(dp), parameter :: dt = (2 * 1E-15), t = (10. * 1E-12) ! dt in fs to s, t in ps to s
 integer, parameter :: maxiter = INT(t/dt)
-real(dp), dimension(3) :: boxsize = (/13.,13.,13./) * 1E-9 ! Boxsize in nm to meter
-real(dp), dimension(3) :: boxsize_half = (/6.5,6.5,6.5/) ! Cutoff in nm to m
-real(dp) :: cutoff = 6.5
+real(dp), dimension(3) :: boxsize = (/3.2,3.2,3.2/) * 1E-9 ! Boxsize in nm to meter
+real(dp), dimension(3) :: boxsize_half = (/1.6,1.6,1.6/) * 1E-9 ! Cutoff in nm to m
+real(dp) :: cutoff = 1.6
 
 ! Particle settings
-integer, parameter :: atom_type = 5 ! 1: He, 2: Ne, 3: Ar, 4: Kr. 5: Xe
+integer, parameter :: atom_type = 3 ! 1: He, 2: Ne, 3: Ar, 4: Kr. 5: Xe
 ! real(dp), parameter :: sigma = 3.40100e-01 , epsilon = 9.78638e-01 ! Ar
 
 ! Thermostat settings
-real(dp), parameter :: tau_T = (1 * 1E-11) ! relaxation time of thermostat in ps to s
-real(dp) :: E, T_inst, T0 = 10. ! in K
+real(dp), parameter :: tau_T = (1 * 1E-12) ! relaxation time of thermostat in ps to s
+real(dp) :: E, T_inst, T0 = 300. ! in K
 
 ! Barostat settings
-real(dp), parameter :: tau_P =  (1. * 1E-7) ! relaxation time of thermostat in ns to s
-real(dp) :: Xi, mu, V_inst, P_inst, P0 = (100. * 1E5)  ! in Bar to Pa
+real(dp), parameter :: tau_P =  (1. * 1E-8) ! relaxation time of thermostat in ns to s
+real(dp) :: Xi, mu, V_inst, P_inst, P0 = (1. * 1E5)  ! in Bar to Pa
 
 ! Runtime variables
-integer :: beginning, rate, end, iter, particle1, particle2, interaction, particle, dim, dim1, dim2, dim3
+integer ::  beginning, rate, end, iter, particle1, particle2, interaction, particle, dim, dim1, dim2, dim3
 character (len=10) :: file_name
 real(dp), dimension(3, nparticles, 1) :: properties ! 1: mass  2: ..   3: .. [x,y,z] for anisotropy
 real(dp), dimension(3, nparticles, -1:1) :: r       ! ([x,y,z], particle, [t-dt, t, t+dt])
@@ -36,11 +36,11 @@ real(dp), dimension(3, nparticles) :: v = 0         ! ([x,y,z], particle)
 real(dp), dimension(3, nparticles, nparticles, 1) :: r_ij = 0 ! Distance triangle matrix
 real(dp), dimension(3, nparticles, nparticles, 1) :: f_ij = 0 ! Force triangle matrix
 real(dp), dimension(3) :: d, d0
-real(dp) :: l
+real(dp) :: timing, l
 
 ! Generate random starting positions in boxsize and initial velocities
 r(:,:,:) = rand_r(nparticles, boxsize) 
-v(:,:) = rand_v(nparticles, int(1 * 1E5))
+v(:,:) = rand_v(nparticles, int(1 * 1E4))
 r(:,:,-1) = r(:,:,0) - v(:,:) * dt
 !call print_rv(r(:,:,0:0), v, nparticles) 
 
@@ -112,6 +112,9 @@ do particle1 = 1, nparticles   ! Interaction for each particle
       f_ij(:, particle2, particle1, 1) = - f_ij(:, particle1, particle2, 1)
     end if
 
+    ! Calculate Virial Xi_ext doublesum, non ideal part of pressure
+    Xi = Xi + 2 * sum(abs(r_ij(:, particle1, particle2, 1)) * abs(f_ij(:, particle1, particle2, 1)), DIM=1)
+
   end do
 end do
 
@@ -126,7 +129,7 @@ end do
 
 ! Thermostat
   ! Calculate E and instantaneous temperature
-  E = (mass(atom_type) / 2) * sum(v ** 2)
+  E = (mass(atom_type) / 2) * sum((v(1,:) ** 2 + v(2,:) ** 2 + v(3,:) ** 2))
   T_inst = ((2 * E) / (3 * kB * nparticles))
   ! Weak coupling thermostat
   v = v * SQRT(1 + (dt / tau_T) * (T0 / T_inst - 1))
@@ -136,13 +139,6 @@ end do
 ! Barostat
   ! Calculate instantaneous volume and pressure
   V_inst = boxsize(1) * boxsize(2) * boxsize(3)
-  ! Calculate Virial Xi_int doublesum, non ideal part of pressure
-  Xi = 0
-  do particle1 = 1, nparticles
-    do particle2 = 1, nparticles
-      Xi = Xi + sum(abs(r_ij(:, particle1, particle2, 1)) * abs(f_ij(:, particle1, particle2, 1)), DIM=1)
-    end do 
-  end do
   P_inst = ((2 * E) / (3 * V_inst)) + (1 / (3 * V_inst)) * Xi
   ! Scaling factor
   mu = (1 - (dt / tau_P) * (P0 - P_inst)) ** (1./3.)
@@ -151,6 +147,7 @@ end do
   boxsize = boxsize * mu
   boxsize_half = boxsize_half * mu
   cutoff = cutoff * mu
+  Xi = 0
 
 ! Console notifier during run
   if (mod(iter, 100)==0) then
@@ -158,23 +155,24 @@ end do
     print *, "Energy (J)",  E, "Temperature (K)", T_inst
     print *, "Volume (nm^3)",  (V_inst * 1E9 ** 3), "Pressure (Pa)", P_inst
     print *, (real(iter)/real(maxiter)*100), "% ", (iter * dt * 1E12), "ps", iter, "/", maxiter
-    print *, "Percentage non-ideal:", (((1 / (3 * V_inst)) * Xi)/(((2 * E) / (3 * V_inst)) + (1 / (3 * V_inst)) * Xi))
+    !print *, "Percentage non-ideal:", (((1 / (3 * V_inst)) * Xi)/(((2 * E) / (3 * V_inst)) + (1 / (3 * V_inst)) * Xi))
     print *, " "
   end if
 
 ! Save trajectories, velocities, forces and thermodynamics data every .. iterations
-  if (mod(iter, 10)==0) then
-    ! do particle = 1, nparticles
-    !   write (file_name,'(i0)') particle
-    !   call save_trajectory("export/r_"//trim(file_name)//".txt", r(:,particle,0))
-    !   call save_trajectory("export/v_"//trim(file_name)//".txt", v(:,particle))
-    !   call save_trajectory("export/f_"//trim(file_name)//".txt", f(:,particle,1))
-    ! end do
-    call save_td_data("export/time.txt", (iter*dt))
-    call save_td_data("export/T.txt", T_inst)
-    call save_td_data("export/V.txt", V_inst)
-    call save_td_data("export/P.txt", P_inst)
-  end if
+  ! if (mod(iter, 10)==0) then
+  !   ! do particle = 1, nparticles
+  !   !   write (file_name,'(i0)') particle
+  !   !   call save_trajectory("export/r_"//trim(file_name)//".txt", r(:,particle,0))
+  !   !   call save_trajectory("export/v_"//trim(file_name)//".txt", v(:,particle))
+  !   !   call save_trajectory("export/f_"//trim(file_name)//".txt", f(:,particle,1))
+  !   ! end do
+  !   !call save_td_data("export/time.txt", (iter*dt))
+  !   !call save_td_data("export/T.txt", T_inst)
+  !   !call save_td_data("export/V.txt", V_inst)
+  !   !call save_td_data("export/P.txt", P_inst)
+  !   call save_trajectory("export/Ekin.txt", (0.5 * mass(atom_type) * (SQRT(v(1,:) ** 2 + v(2,:) ** 2 + v(3,:) ** 2)) ** 2))
+  ! end if
 
 ! Checks if simulation failed every .. iterations
   if (mod(iter, 1000)==0) then
@@ -189,12 +187,10 @@ end do
 end do integrator
 
 ! -------------------------------------------------------------------------------------------- !
-  
-!call print_rv(r, v, nparticles) 
-
-print *, "Mean velocity", sum(abs(v)) / nparticles
 
 call system_clock(end)
-print *, "Elapsed time: ", real(end - beginning) / real(rate), "seconds."
+timing = real(end - beginning) / real(rate)
+print *, "Elapsed time: ", timing, "seconds"
+print *, "with", (maxiter/timing), "iter/s and", (t/timing*1E15), "fs/s"
 
 end program main

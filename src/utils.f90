@@ -51,7 +51,7 @@ end subroutine save_trajectory
 
 subroutine save_td_data(filename, d)
     character(len=*), intent(in) :: filename  ! File to save the array to
-    real(dp), intent(in) :: d          ! The 2D array to save
+    real(dp), intent(in) :: d          
 
     integer :: s, i
     open(newunit=s, file=filename, access="sequential",  position="append")
